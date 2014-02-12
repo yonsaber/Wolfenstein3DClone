@@ -1,81 +1,173 @@
 package com.base.engine;
 
+import java.util.ArrayList;
+
 public class Game {
-	private Mesh mesh;
-	private Transform transform;
-	private Shader shader;
-	private Material material;
-	private Camera camera;
 	
-	PointLight pLight1 = new PointLight(new BaseLight(new Vector3f(1, 0.5f, 0), 0.8f), new Attenuation(0, 0, 1), new Vector3f(-2, 0, 5f), 10);
-	PointLight pLight2 = new PointLight(new BaseLight(new Vector3f(0, 0.5f, 1), 0.8f), new Attenuation(0, 0, 1), new Vector3f(2, 0, 7f), 10);
+	Bitmap level;
+	Shader shader;
+	Material material;
+	Mesh mesh;
+	Transform transform;
 	
-	SpotLight sLight1 = new SpotLight(new PointLight(new BaseLight(new Vector3f(0, 1f, 1f), 0.8f), new Attenuation(0, 0, 0.1f), new Vector3f(2, 0, 7f), 30), new Vector3f(1, 1, 1), 0.7f);
+	private static final float SPOT_WIDTH = 1;
+	private static final float SPOT_LENGTH = 1;
+	private static final float SPOT_HEIGHT = 1;
+	
+	private static final int NUM_TEX_EXP = 4;
+	private static final int NUM_TEXTURES = (int)Math.pow(2, NUM_TEX_EXP);
 	
 	public Game() {
-		//mesh = ResourceLoader.loadMesh("box.obj");
-		material = new Material(new Texture("test.png"), new Vector3f(1, 1, 1), 1, 8);
-		shader = new PhongShader();
-		camera = new Camera();
+		level = new Bitmap("testLevel.png").flipY();
+		
+//		for (int i = 0; i < level.getWidth(); i++) {
+//			for (int j = 0; j < level.getHeight(); j++) {
+//				System.out.print(level.getPixel(i, j));
+//			}
+//			System.out.println();
+//		}
+		
+		shader = BasicShader.getInstance();
+		material = new Material(new Texture("WolfCollection.png"));
+		
+		ArrayList<Vertex> vertices = new ArrayList<Vertex>();
+		ArrayList<Integer> indices = new ArrayList<Integer>();
+		
+		for (int i = 0; i < level.getWidth(); i++) {
+			for (int j = 0; j < level.getHeight(); j++) {
+				if ((level.getPixel(i, j) & 0xFFFFFF) == 0) {
+					continue;
+				}
+				
+				int texX = ((level.getPixel(i, j) & 0x00FF00) >> 8) / NUM_TEXTURES;
+				int texY = texX % NUM_TEX_EXP;
+				texX /= NUM_TEX_EXP;
+				
+				float XHigher = 1f - (float)texX / (float)NUM_TEX_EXP;
+				float XLower = XHigher - 1f / (float)NUM_TEX_EXP;
+				float YLower = 1f - (float)texY / (float)NUM_TEX_EXP;
+				float YHigher = YLower - 1f / (float)NUM_TEX_EXP;
+				
+				//Generate Floor
+				indices.add(vertices.size() + 2);
+				indices.add(vertices.size() + 1);
+				indices.add(vertices.size() + 0);
+				indices.add(vertices.size() + 3);
+				indices.add(vertices.size() + 2);
+				indices.add(vertices.size() + 0);
+				
+				vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, 0, j * SPOT_LENGTH), new Vector2f(XLower, YLower)));
+				vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, 0, j * SPOT_LENGTH), new Vector2f(XHigher, YLower)));
+				vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, 0, (j + 1) * SPOT_LENGTH), new Vector2f(XHigher, YHigher)));
+				vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, 0, (j + 1) * SPOT_LENGTH), new Vector2f(XLower, YHigher)));
+				
+				//Generate Ceiling
+				indices.add(vertices.size() + 0);
+				indices.add(vertices.size() + 1);
+				indices.add(vertices.size() + 2);
+				indices.add(vertices.size() + 0);
+				indices.add(vertices.size() + 2);
+				indices.add(vertices.size() + 3);
+				
+				vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, SPOT_HEIGHT, j * SPOT_LENGTH), new Vector2f(XLower, YLower)));
+				vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, SPOT_HEIGHT, j * SPOT_LENGTH), new Vector2f(XHigher, YLower)));
+				vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, SPOT_HEIGHT, (j + 1) * SPOT_LENGTH), new Vector2f(XHigher, YHigher)));
+				vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, SPOT_HEIGHT, (j + 1) * SPOT_LENGTH), new Vector2f(XLower, YHigher)));
+				
+				texX = ((level.getPixel(i, j) & 0xFF0000) >> 16) / NUM_TEXTURES;
+				texY = texX % NUM_TEX_EXP;
+				texX /= NUM_TEX_EXP;
+				
+				XHigher = 1f - (float)texX / (float)NUM_TEX_EXP;
+				XLower = XHigher - 1f / (float)NUM_TEX_EXP;
+				YLower = 1f - (float)texY / (float)NUM_TEX_EXP;
+				YHigher = YLower - 1f / (float)NUM_TEX_EXP;
+				
+				//Generate Walls
+				if ((level.getPixel(i, j - 1) & 0xFFFFFF) == 0) {
+					indices.add(vertices.size() + 0);
+					indices.add(vertices.size() + 1);
+					indices.add(vertices.size() + 2);
+					indices.add(vertices.size() + 0);
+					indices.add(vertices.size() + 2);
+					indices.add(vertices.size() + 3);
+					
+					vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, 0, j * SPOT_LENGTH), new Vector2f(XLower, YLower)));
+					vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, 0, j * SPOT_LENGTH), new Vector2f(XHigher, YLower)));
+					vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, SPOT_HEIGHT, j * SPOT_LENGTH), new Vector2f(XHigher, YHigher)));
+					vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, SPOT_HEIGHT, j * SPOT_LENGTH), new Vector2f(XLower, YHigher)));
+				}
+				if ((level.getPixel(i, j + 1) & 0xFFFFFF) == 0) {
+					indices.add(vertices.size() + 2);
+					indices.add(vertices.size() + 1);
+					indices.add(vertices.size() + 0);
+					indices.add(vertices.size() + 3);
+					indices.add(vertices.size() + 2);
+					indices.add(vertices.size() + 0);
+					
+					vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, 0, (j + 1) * SPOT_LENGTH), new Vector2f(XLower, YLower)));
+					vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, 0, (j + 1) * SPOT_LENGTH), new Vector2f(XHigher, YLower)));
+					vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, SPOT_HEIGHT, (j + 1) * SPOT_LENGTH), new Vector2f(XHigher, YHigher)));
+					vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, SPOT_HEIGHT, (j + 1) * SPOT_LENGTH), new Vector2f(XLower, YHigher)));
+				}
+				if ((level.getPixel(i - 1, j) & 0xFFFFFF) == 0) {
+					indices.add(vertices.size() + 2);
+					indices.add(vertices.size() + 1);
+					indices.add(vertices.size() + 0);
+					indices.add(vertices.size() + 3);
+					indices.add(vertices.size() + 2);
+					indices.add(vertices.size() + 0);
+					
+					vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, 0, j * SPOT_LENGTH), new Vector2f(XLower, YLower)));
+					vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, 0, (j + 1) * SPOT_LENGTH), new Vector2f(XHigher, YLower)));
+					vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, SPOT_HEIGHT, (j + 1) * SPOT_LENGTH), new Vector2f(XHigher, YHigher)));
+					vertices.add(new Vertex(new Vector3f(i * SPOT_WIDTH, SPOT_HEIGHT, j * SPOT_LENGTH), new Vector2f(XLower, YHigher)));
+				}
+				if ((level.getPixel(i + 1, j) & 0xFFFFFF) == 0) {
+					indices.add(vertices.size() + 0);
+					indices.add(vertices.size() + 1);
+					indices.add(vertices.size() + 2);
+					indices.add(vertices.size() + 0);
+					indices.add(vertices.size() + 2);
+					indices.add(vertices.size() + 3);
+					
+					vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, 0, j * SPOT_LENGTH), new Vector2f(XLower, YLower)));
+					vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, 0, (j + 1) * SPOT_LENGTH), new Vector2f(XHigher, YLower)));
+					vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, SPOT_HEIGHT, (j + 1) * SPOT_LENGTH), new Vector2f(XHigher, YHigher)));
+					vertices.add(new Vertex(new Vector3f((i + 1) * SPOT_WIDTH, SPOT_HEIGHT, j * SPOT_LENGTH), new Vector2f(XLower, YHigher)));
+				}
+			}
+		}
+		
+//		Vertex[] vertices = new Vertex[] {	new Vertex(new Vector3f(0, 0, 0), new Vector2f(0, 0)),
+//											new Vertex(new Vector3f(0, 1, 0), new Vector2f(0, 1)),
+//											new Vertex(new Vector3f(1, 1, 0), new Vector2f(1, 1)),
+//											new Vertex(new Vector3f(1, 0, 0), new Vector2f(1, 0))};
+//		
+//		int[] indices = new int[] { 0,1,2,
+//									0,2,3};
+		
+		Vertex[] vertArray = new Vertex[vertices.size()];
+		Integer[] intArray = new Integer[indices.size()];
+		
+		vertices.toArray(vertArray);
+		indices.toArray(intArray);
+		
+		mesh = new Mesh(vertArray, Util.toIntArray(intArray));
 		transform = new Transform();
-		
-//		Vertex[] vertices = new Vertex[] { new Vertex( new Vector3f(-1.0f, -1.0f, 0.5773f),	new Vector2f(0.0f, 0.0f)),
-//		        new Vertex( new Vector3f(0.0f, -1.0f, -1.15475f),		new Vector2f(0.5f, 0.0f)),
-//		        new Vertex( new Vector3f(1.0f, -1.0f, 0.5773f),		new Vector2f(1.0f, 0.0f)),
-//		        new Vertex( new Vector3f(0.0f, 1.0f, 0.0f),      new Vector2f(0.5f, 1.0f)) };
-//
-//				int indices[] = { 0, 3, 1,
-//				1, 3, 2,
-//				2, 3, 0,
-//				1, 2, 0 };
-		
-		float fieldDepth = 10.0f;
-		float fieldWidth = 10.0f;
-
-		Vertex[] vertices = new Vertex[] { 	new Vertex( new Vector3f(-fieldWidth, 0.0f, -fieldDepth), new Vector2f(0.0f, 0.0f)),
-											new Vertex( new Vector3f(-fieldWidth, 0.0f, fieldDepth * 3), new Vector2f(0.0f, 1.0f)),
-											new Vertex( new Vector3f(fieldWidth * 3, 0.0f, -fieldDepth), new Vector2f(1.0f, 0.0f)),
-											new Vertex( new Vector3f(fieldWidth * 3, 0.0f, fieldDepth * 3), new Vector2f(1.0f, 1.0f))};
-
-		int indices[] = { 0, 1, 2,
-					      2, 1, 3};
-		
-		mesh = new Mesh(vertices, indices, true);
-
-		Transform.setCamera(camera);
-		transform.setProjection(70f, Window.getWidth(), Window.getHeight(), 0.1f, 1000);
-		
-		PhongShader.setAmbientLight(new Vector3f(0.1f,0.1f,0.1f));
-		PhongShader.setDirectionalLight(new DirectionalLight(new BaseLight(new Vector3f(1, 1, 1), 0.1f), new Vector3f(1, 1, 1)));
-		
-		PhongShader.setPointLight(new PointLight[] {pLight1, pLight2});
-		PhongShader.setSpotLight(new SpotLight[] {sLight1});
+		Transform.setCamera(new Camera());
+		Transform.setProjection(70, Window.getWidth(), Window.getHeight(), 0.01f, 1000f);
  	}
 	
 	public void input() {
-		camera.input();
+		Transform.getCamera().input();
 	}
 	
-	float temp = 0.0f;
-	
 	public void update() {
-		temp += Time.getDelta();
-
-		float sinTemp = (float)Math.sin(temp);
 		
-		transform.setTranslation(0, -1, 5);
-		//transform.setRotation(0, sinTemp * 360, 0);
-		//transform.setScale(0.7f * sinTemp, 0.7f * sinTemp, 0.7f * sinTemp);
-		
-		pLight1.setPosition(new Vector3f(3,0,8.0f * (float)(Math.sin(sinTemp) + 1.0/2.0) + 10));
-		pLight2.setPosition(new Vector3f(7,0,8.0f * (float)(Math.cos(sinTemp) + 1.0/2.0) + 10));
-		
-		sLight1.getPointLight().setPosition(camera.getPos());
-		sLight1.setDirection(camera.getForward());
 	}
 
 	public void render() {
-		RenderUtil.setClearColor(Transform.getCamera().getPos().div(2048f).abs());
 		shader.bind();
 		shader.updateUniforms(transform.getTransformation(), transform.getProjectedTransformation(), material);
 		mesh.draw();
